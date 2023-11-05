@@ -1,0 +1,6 @@
+api_link = 'https://api.viz.berlin.de/daten/baustellen_sperrungen.json'
+default_city = 'Berlin'
+default_direction = 'AB'
+default_dexx = 'deXXX'
+datetime_input_format = '%d.%m.%Y %H:%M'
+datetime_output_format = '%d.%m.%Y - %H:%M'

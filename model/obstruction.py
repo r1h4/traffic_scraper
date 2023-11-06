@@ -4,6 +4,7 @@ import params
 
 class Obstruction:
     def __init__(self,
+                 id=None,
                  val_from=None,
                  val_until=None,
                  city=None,
@@ -12,17 +13,22 @@ class Obstruction:
                  number=None,
                  lat=None,
                  lon=None,
+                 fe_type=None,
                  reason=None,
                  description=None,
                  direction=None,
                  dexx=None):
+        if id is None:
+            self.id = datetime.now()
+        else:
+            self.id = id
         if val_from is None:
             self.val_from = datetime.now()
         else:
             self.val_from = datetime.strptime(val_from, params.datetime_input_format)
 
         if val_until is None:
-            self.val_until = datetime.now() + timedelta(1)
+            self.val_until = self.val_from + timedelta(1)
         else:
             self.val_until = datetime.strptime(val_until, params.datetime_input_format)
 
@@ -56,6 +62,11 @@ class Obstruction:
         else:
             self.lon = lon
 
+        if fe_type is None:
+            self.fe_type = ''
+        else:
+            self.fe_type = fe_type
+
         if reason is None:
             self.reason = ''
         else:
@@ -77,19 +88,26 @@ class Obstruction:
             self.dexx = dexx
 
     def from_json(self, json_data):
-        if 'from' not in json_data['properties']['validity']:
+        if 'id' not in json_data['properties']:
             pass
+        elif json_data['properties']['id'] is None:
+            pass
+        else:
+            self.id = json_data['properties']['id']
+
+        if 'from' not in json_data['properties']['validity']:
+            self.val_from = datetime.now()
         elif json_data['properties']['validity']['from'] is None:
             self.val_from = datetime.now()
         else:
             self.val_from = datetime.strptime(json_data['properties']['validity']['from'], params.datetime_input_format)
 
         if 'to' not in json_data['properties']['validity']:
-            pass
+            self.val_until = self.val_from + timedelta(1)
         elif json_data['properties']['validity']['to'] is None:
-            self.val_from = datetime.now() + timedelta(1)
+            self.val_until = self.val_until + timedelta(1)
         else:
-            self.val_from = datetime.strptime(json_data['properties']['validity']['to'], params.datetime_input_format)
+            self.val_until = datetime.strptime(json_data['properties']['validity']['to'], params.datetime_input_format)
 
         if 'street' in json_data['properties']:
             self.street = json_data['properties']['street']
@@ -105,21 +123,25 @@ class Obstruction:
         elif json_data['properties']['severity'] is None:
             pass
         else:
-            self.description = json_data['properties']['severity']
+            self.reason = json_data['properties']['severity']
 
         if 'subtype' not in json_data['properties']:
             pass
         elif json_data['properties']['subtype'] is None:
             pass
+        elif json_data['properties']['subtype'] in ('Baustelle', 'Bauarbeiten', 'Fahrstreifensperrung'):
+            self.fe_type = 'ROAD_WORKS'
+        elif json_data['properties']['subtype'] == 'Sperrung':
+            self.fe_type = 'ROAD_CLOSED'
         else:
-            self.reason = json_data['properties']['subtype']
+            self.fe_type = 'INCIDENT'
 
         if 'content' not in json_data['properties']:
             pass
         elif json_data['properties']['content'] is None:
             pass
         else:
-            self.description = self.description + ' # ' + json_data['properties']['content']
+            self.description = json_data['properties']['content']
 
         if 'direction' not in json_data['properties']:
             pass
@@ -133,8 +155,38 @@ class Obstruction:
             self.district = self.street[self.street.find('(') + 1:self.street.find(')')]
             self.street = self.street[:self.street.find('(')]
 
-    def to_csv_row(self):
+    def to_csv_row_wdx3(self):
         csv_row = (
+            self.val_from.strftime(params.datetime_output_format),
+            self.val_until.strftime(params.datetime_output_format),
+            self.city,
+            self.district,
+            self.street,
+            self.number,
+            self.lat,
+            self.lon,
+            self.fe_type,
+            self.description,
+            self.direction,
+            self.dexx
+        )
+        return csv_row
+
+    def to_csv_row(self):
+        if self.fe_type == 'ROAD_CLOSED':
+            important = True
+        else:
+            important = False
+
+        fe_name = self.street
+        if self.reason is None or self.reason == '':
+            pass
+        else:
+            fe_name += ' - ' + self.reason
+
+        csv_row = (
+            self.id,
+            self.fe_type,
             self.val_from.strftime(params.datetime_output_format),
             self.val_until.strftime(params.datetime_output_format),
             self.city,
@@ -145,7 +197,12 @@ class Obstruction:
             self.lon,
             self.reason,
             self.description,
-            self.direction,
-            self.dexx
+            self.id,
+            '0.0',
+            '0.0',
+            '0.0',
+            '0.0',
+            important,
+            self.street + ' - ' + self.reason
         )
         return csv_row
